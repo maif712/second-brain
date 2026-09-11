@@ -7,6 +7,7 @@ import { TYPE_META } from '@/features/knowledge/lib/typeMeta';
 import type { EntityType, KnowledgeNode, QuestionStatus, ResourceKind } from '@/features/knowledge/types';
 import { cn } from '@/lib/cn';
 import { useToast } from '@/components/ui/toast/ToastContext';
+import { Select } from '@/components/ui/Select';
 
 const inputCls =
     'w-full rounded-xl border border-white/10 bg-white/[0.04] px-3.5 py-2.5 text-sm text-white placeholder:text-slate-600 outline-none transition focus:border-violet-400/50 focus:ring-2 focus:ring-violet-400/20';
@@ -158,10 +159,15 @@ export function NodeFormModal({ open, onClose, initial = null, defaultType = 'co
                 {form.type === 'question' && (
                     <div>
                         <label htmlFor="nb-status" className={labelCls}>Status</label>
-                        <select id="nb-status" value={form.status} onChange={(e) => set('status', e.target.value as QuestionStatus)} className={selectCls}>
-                            <option value="open">Open — still hunting the answer</option>
-                            <option value="answered">Answered</option>
-                        </select>
+                        <Select
+                            ariaLabel="Question status"
+                            value={form.status}
+                            onChange={(v) => set('status', v as QuestionStatus)}
+                            options={[
+                                { value: 'open', label: 'Open — still hunting the answer' },
+                                { value: 'answered', label: 'Answered' },
+                            ]}
+                        />
                     </div>
                 )}
 
@@ -179,11 +185,12 @@ export function NodeFormModal({ open, onClose, initial = null, defaultType = 'co
                         </div>
                         <div>
                             <label htmlFor="nb-kind" className={labelCls}>Kind</label>
-                            <select id="nb-kind" value={form.resourceKind} onChange={(e) => set('resourceKind', e.target.value as ResourceKind)} className={selectCls}>
-                                {(['article', 'video', 'book', 'course', 'podcast', 'other'] as ResourceKind[]).map((k) => (
-                                    <option key={k} value={k}>{k}</option>
-                                ))}
-                            </select>
+                            <Select
+                                ariaLabel="Resource kind"
+                                value={form.resourceKind}
+                                onChange={(v) => set('resourceKind', v as ResourceKind)}
+                                options={(['article', 'video', 'book', 'course', 'podcast', 'other'] as ResourceKind[]).map((k) => ({ value: k, label: k }))}
+                            />
                         </div>
                     </div>
                 )}

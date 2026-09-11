@@ -38,8 +38,46 @@
 }
 
 @layer base {
+
+    /* src/styles/index.css — add inside the @layer base block */
+
+    :root {
+        color-scheme: dark;
+        /* native UI (select popups, autofill, spinners) renders dark */
+    }
+
+    select {
+        color-scheme: dark;
+    }
+
+    /* Native option lists don't take Tailwind classes — style them here */
+    select option,
+    select optgroup {
+        background-color: var(--color-ink);
+        color: #e2e8f0;
+    }
+
+    /* Highlight the currently selected row */
+    select option:checked {
+        background: linear-gradient(0deg, rgb(139 92 246 / 0.35), rgb(139 92 246 / 0.35));
+        color: #ffffff;
+    }
+
+    select option:disabled {
+        color: #64748b;
+    }
+
+    /* Lenis owns scrolling now — native smooth-scroll would double-ease and glitch */
+    html {
+        background-color: var(--color-void);
+        /* no white flash on overscroll */
+        overscroll-behavior: none;
+        /* kill rubber-band at top/bottom */
+    }
+
     body {
         @apply bg-void font-sans text-slate-200 antialiased;
+        overscroll-behavior: none;
     }
 
     ::selection {
@@ -69,7 +107,24 @@
         background: #333a4f;
     }
 
-    /* Accessibility edge case: kill motion for users who ask for it */
+    /* Official Lenis companion styles */
+    html.lenis,
+    html.lenis body {
+        height: auto;
+    }
+
+    .lenis.lenis-smooth {
+        scroll-behavior: auto !important;
+    }
+
+    .lenis.lenis-smooth [data-lenis-prevent] {
+        overflow: hidden;
+    }
+
+    .lenis.lenis-stopped {
+        overflow: hidden;
+    }
+
     @media (prefers-reduced-motion: reduce) {
 
         *,

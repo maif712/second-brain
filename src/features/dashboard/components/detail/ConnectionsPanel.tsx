@@ -7,6 +7,7 @@ import { TYPE_META } from '@/features/knowledge/lib/typeMeta';
 import type { KnowledgeNode } from '@/features/knowledge/types';
 import { cn } from '@/lib/cn';
 import { useToast } from '@/components/ui/toast/ToastContext';
+import { Select } from '@/components/ui/Select';
 
 const fieldCls =
     'rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2.5 text-sm text-slate-200 outline-none transition focus:border-violet-400/50 focus:ring-2 focus:ring-violet-400/20';
@@ -96,12 +97,14 @@ export function ConnectionsPanel({ node }: { node: KnowledgeNode }) {
                     <p className="text-xs text-slate-600">Nothing left to link — add more items to your library first.</p>
                 ) : (
                     <div className="flex flex-col gap-3 sm:flex-row">
-                        <select value={targetId} onChange={(e) => setTargetId(e.target.value)} className={cn(fieldCls, 'bg-ink sm:flex-1')} aria-label="Choose item to link">
-                            <option value="">Choose an item…</option>
-                            {candidates.map((n) => (
-                                <option key={n.id} value={n.id}>{TYPE_META[n.type].label} · {n.title}</option>
-                            ))}
-                        </select>
+                        <Select
+                            ariaLabel="Choose item to link"
+                            value={targetId}
+                            onChange={setTargetId}
+                            placeholder="Choose an item…"
+                            options={candidates.map((n) => ({ value: n.id, label: n.title, meta: TYPE_META[n.type].label }))}
+                            className="sm:flex-1"
+                        />
                         <input
                             value={label}
                             onChange={(e) => setLabel(e.target.value)}

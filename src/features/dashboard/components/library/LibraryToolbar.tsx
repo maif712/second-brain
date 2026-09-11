@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/Button';
 import { TYPE_META } from '@/features/knowledge/lib/typeMeta';
 import type { EntityType } from '@/features/knowledge/types';
 import { cn } from '@/lib/cn';
+import { Select } from '@/components/ui/Select';
 
 export type SortKey = 'updated' | 'created' | 'alpha';
 
@@ -32,7 +33,7 @@ export function LibraryToolbar({
                         id="library-search"
                         value={query}
                         onChange={(e) => onQuery(e.target.value)}
-                        placeholder='Search titles, tags and content… (try "context" or "why")'
+                        placeholder='Narrow this page… (title, tags, content)'
                         className={cn(fieldCls, 'w-full pl-10 pr-9 placeholder:text-slate-600')}
                     />
                     {query && (
@@ -42,16 +43,29 @@ export function LibraryToolbar({
                     )}
                 </label>
 
-                <select value={sort} onChange={(e) => onSort(e.target.value as SortKey)} className={cn(fieldCls, 'bg-ink')} aria-label="Sort items">
-                    <option value="updated">Sort: recently updated</option>
-                    <option value="created">Sort: newest</option>
-                    <option value="alpha">Sort: A → Z</option>
-                </select>
 
-                <select value={tagFilter} onChange={(e) => onTagFilter(e.target.value)} className={cn(fieldCls, 'bg-ink')} aria-label="Filter by tag">
-                    <option value="all">All tags</option>
-                    {tags.map((t) => <option key={t} value={t}>#{t}</option>)}
-                </select>
+                <Select
+                    ariaLabel="Sort items"
+                    value={sort}
+                    onChange={(v) => onSort(v as SortKey)}
+                    options={[
+                        { value: 'updated', label: 'Recently updated' },
+                        { value: 'created', label: 'Newest first' },
+                        { value: 'alpha', label: 'A → Z' },
+                    ]}
+                    className="md:w-52"
+                />
+
+                <Select
+                    ariaLabel="Filter by tag"
+                    value={tagFilter}
+                    onChange={onTagFilter}
+                    options={[
+                        { value: 'all', label: 'All tags' },
+                        ...tags.map((t) => ({ value: t, label: `#${t}` })),
+                    ]}
+                    className="md:w-44"
+                />
 
                 <Button onClick={onNew} className="shrink-0"><Plus size={16} /> New item</Button>
             </div>
