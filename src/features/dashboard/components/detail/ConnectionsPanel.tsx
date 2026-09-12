@@ -4,10 +4,10 @@ import { Link } from 'react-router';
 import { ArrowLeft, ArrowRight, Link2, Plus, X } from 'lucide-react';
 import { useKnowledgeState, useKnowledgeActions } from '@/features/knowledge/context/KnowledgeContext';
 import { TYPE_META } from '@/features/knowledge/lib/typeMeta';
-import type { KnowledgeNode } from '@/features/knowledge/types';
-import { cn } from '@/lib/cn';
 import { useToast } from '@/components/ui/toast/ToastContext';
-import { Select } from '@/components/ui/Select';
+import type { KnowledgeNode } from '@/features/knowledge/types';
+import { NodePicker } from './NodePicker';
+import { cn } from '@/lib/cn';
 
 const fieldCls =
     'rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2.5 text-sm text-slate-200 outline-none transition focus:border-violet-400/50 focus:ring-2 focus:ring-violet-400/20';
@@ -15,10 +15,9 @@ const fieldCls =
 export function ConnectionsPanel({ node }: { node: KnowledgeNode }) {
     const { nodes, links } = useKnowledgeState();
     const { addLink, removeLink } = useKnowledgeActions();
+    const { toast } = useToast();
     const [targetId, setTargetId] = useState('');
     const [label, setLabel] = useState('');
-
-    const { toast } = useToast();
 
     const connections = useMemo(
         () =>
@@ -27,21 +26,29 @@ export function ConnectionsPanel({ node }: { node: KnowledgeNode }) {
                 .flatMap((l) => {
                     const otherId = l.sourceId === node.id ? l.targetId : l.sourceId;
                     const other = nodes.find((n) => n.id === otherId);
-                    return other ? [{ link: l, outgoing: l.sourceId === node.id, other }] : []; // drops dangling links
+                    return other ? [{ link: l, outgoing: l.sourceId === node.id, other }] : [];
                 }),
         [links, nodes, node.id],
     );
 
-    // Candidates exclude self + already-linked items, so duplicates can't even be attempted.
-    const linkedIds = new Set(connections.map((c) => c.other.id));
-    const candidates = nodes
-        .filter((n) => n.id !== node.id && !linkedIds.has(n.id))
-        .sort((a, b) => a.title.localeCompare(b.title));
+    // Memoized → stable reference, so the picker's effect doesn't refire every render
+    const excludeIds = useMemo(() => {
+        const s = new Set<string>([node.id]);
+        connections.forEach((c) => s.add(c.other.id));
+        return s;
+    }, [connections, node.id]);
+
+    const availableCount = useMemo(
+        () => nodes.reduce((acc, n) => (excludeIds.has(n.id) ? acc : acc + 1), 0),
+        [nodes, excludeIds],
+    );
+
+    const selectedTarget = targetId ? nodes.find((n) => n.id === targetId) : undefined;
 
     const handleAdd = (e: FormEvent) => {
         e.preventDefault();
         if (!targetId) return;
-        const target = candidates.find((n) => n.id === targetId);
+        const target = nodes.find((x) => x.id === targetId);
         addLink(node.id, targetId, label.trim() || 'related to');
         toast(target ? `Linked with “${target.title}”` : 'Connected');
         setTargetId('');
@@ -93,31 +100,38 @@ export function ConnectionsPanel({ node }: { node: KnowledgeNode }) {
             {/* Link editor */}
             <form onSubmit={handleAdd} className="mt-5 space-y-3 border-t border-white/5 pt-5">
                 <p className="text-xs font-medium uppercase tracking-wider text-slate-500">Add connection</p>
-                {candidates.length === 0 ? (
+
+                {availableCount === 0 ? (
                     <p className="text-xs text-slate-600">Nothing left to link — add more items to your library first.</p>
                 ) : (
-                    <div className="flex flex-col gap-3 sm:flex-row">
-                        <Select
-                            ariaLabel="Choose item to link"
-                            value={targetId}
-                            onChange={setTargetId}
-                            placeholder="Choose an item…"
-                            options={candidates.map((n) => ({ value: n.id, label: n.title, meta: TYPE_META[n.type].label }))}
-                            className="sm:flex-1"
-                        />
-                        <input
-                            value={label}
-                            onChange={(e) => setLabel(e.target.value)}
-                            placeholder='Label (e.g. “part of”)'
-                            className={cn(fieldCls, 'sm:w-48 placeholder:text-slate-600')}
-                        />
-                        <button
-                            type="submit" disabled={!targetId}
-                            className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-linear-to-r from-violet-500 to-fuchsia-500 px-4 py-2.5 text-sm font-semibold text-white transition hover:brightness-110 disabled:pointer-events-none disabled:opacity-40"
-                        >
-                            <Plus size={15} /> Link
-                        </button>
-                    </div>
+                    <>
+                        <NodePicker onPick={(n) => setTargetId(n.id)} excludeIds={excludeIds} />
+
+                        {selectedTarget && (
+                            <div className="flex items-center justify-between rounded-xl border border-violet-400/30 bg-violet-400/10 px-3 py-2">
+                                <span className="truncate text-sm text-violet-200">Linking to: {selectedTarget.title}</span>
+                                <button type="button" onClick={() => setTargetId('')} aria-label="Clear selection" className="text-violet-300 transition hover:text-white">
+                                    <X size={14} />
+                                </button>
+                            </div>
+                        )}
+
+                        <div className="flex flex-col gap-3 sm:flex-row">
+                            <input
+                                value={label}
+                                onChange={(e) => setLabel(e.target.value)}
+                                placeholder='Label (e.g. “part of”)'
+                                className={cn(fieldCls, 'sm:flex-1 placeholder:text-slate-600')}
+                            />
+                            <button
+                                type="submit"
+                                disabled={!targetId}
+                                className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-linear-to-r from-violet-500 to-fuchsia-500 px-4 py-2.5 text-sm font-semibold text-white transition hover:brightness-110 disabled:pointer-events-none disabled:opacity-40"
+                            >
+                                <Plus size={15} /> Link
+                            </button>
+                        </div>
+                    </>
                 )}
             </form>
         </section>
