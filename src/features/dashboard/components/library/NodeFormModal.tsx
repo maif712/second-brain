@@ -11,7 +11,6 @@ import { Select } from '@/components/ui/Select';
 
 const inputCls =
     'w-full rounded-xl border border-white/10 bg-white/[0.04] px-3.5 py-2.5 text-sm text-white placeholder:text-slate-600 outline-none transition focus:border-violet-400/50 focus:ring-2 focus:ring-violet-400/20';
-const selectCls = cn(inputCls, 'bg-ink');
 const labelCls = 'mb-1.5 block text-xs font-medium uppercase tracking-wider text-slate-500';
 
 interface FormState {
