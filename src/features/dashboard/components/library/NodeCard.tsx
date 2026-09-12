@@ -1,8 +1,10 @@
 // src/features/dashboard/components/library/NodeCard.tsx
 import { Link } from 'react-router';
 import { Pencil, Trash2 } from 'lucide-react';
+import { useKnowledgeState } from '@/features/knowledge/context/KnowledgeContext';
 import type { KnowledgeNode } from '@/features/knowledge/types';
 import { TYPE_META } from '@/features/knowledge/lib/typeMeta';
+import { getProjectColor } from '@/features/knowledge/lib/projectColors';
 import { timeAgo } from '@/features/knowledge/lib/format';
 import { cn } from '@/lib/cn';
 
@@ -11,19 +13,31 @@ interface NodeCardProps {
     linkCount: number;
     onEdit: (node: KnowledgeNode) => void;
     onDelete: (node: KnowledgeNode) => void;
+    /** Hide the project chip when the card is already inside a project workspace. */
+    showProject?: boolean;
 }
 
-export function NodeCard({ node, linkCount, onEdit, onDelete }: NodeCardProps) {
+export function NodeCard({ node, linkCount, onEdit, onDelete, showProject = true }: NodeCardProps) {
+    const { projects } = useKnowledgeState();
     const m = TYPE_META[node.type];
     const Icon = m.icon;
 
+    // Edge cases covered: showProject off, no projectId, or an orphan projectId
+    // (deleted project) → simply renders no chip.
+    const project = showProject && node.projectId
+        ? projects.find((p) => p.id === node.projectId)
+        : undefined;
+    const pc = project ? getProjectColor(project.color) : null;
+
     return (
-        <div className="group relative overflow-hidden rounded-2xl border border-white/5 bg-white/3 transition duration-300 hover:-translate-y-1 hover:border-violet-400/25 hover:bg-white/5 hover:shadow-xl hover:shadow-violet-500/5">
+        <div className="group relative overflow-hidden rounded-2xl border border-white/5 bg-white/[0.03] transition duration-300 hover:-translate-y-1 hover:border-violet-400/25 hover:bg-white/[0.05] hover:shadow-xl hover:shadow-violet-500/5">
             <Link to={`/dashboard/nodes/${node.id}`} className="block p-5">
-                <div className="mb-3 flex items-center gap-2">
+                {/* Badges: type · question status · project */}
+                <div className="mb-3 flex flex-wrap items-center gap-2">
                     <span className={cn('inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium ring-1', m.bg, m.text, m.ring)}>
                         <Icon size={11} /> {m.label}
                     </span>
+
                     {node.type === 'question' && (
                         <span className={cn(
                             'rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ring-1',
@@ -34,11 +48,22 @@ export function NodeCard({ node, linkCount, onEdit, onDelete }: NodeCardProps) {
                             {node.status}
                         </span>
                     )}
+
+                    {project && pc && (
+                        <span className={cn('inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium ring-1', pc.bg, pc.text, pc.ring)}>
+                            <span className={cn('h-1.5 w-1.5 rounded-full', pc.dot)} />
+                            {project.name}
+                        </span>
+                    )}
                 </div>
 
+                {/* Title + snippet */}
                 <h3 className="font-display text-base font-semibold text-white">{node.title}</h3>
-                {node.content && <p className="mt-1.5 line-clamp-2 text-sm leading-relaxed text-slate-500">{node.content}</p>}
+                {node.content && (
+                    <p className="mt-1.5 line-clamp-2 text-sm leading-relaxed text-slate-500">{node.content}</p>
+                )}
 
+                {/* Tags */}
                 {node.tags.length > 0 && (
                     <div className="mt-3 flex flex-wrap gap-1.5">
                         {node.tags.slice(0, 3).map((t) => (
@@ -48,6 +73,7 @@ export function NodeCard({ node, linkCount, onEdit, onDelete }: NodeCardProps) {
                     </div>
                 )}
 
+                {/* Footer */}
                 <div className="mt-4 flex items-center justify-between text-[11px] text-slate-600">
                     <span>updated {timeAgo(node.updatedAt)}</span>
                     <span>{linkCount} link{linkCount === 1 ? '' : 's'}</span>

@@ -1,4 +1,4 @@
-// src/features/dashboard/pages/LibraryPage.tsx  (full file — browse & narrow edition)
+// src/features/dashboard/pages/LibraryPage.tsx
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router';
 import { BrainCircuit, FilterX } from 'lucide-react';
@@ -17,28 +17,44 @@ const TYPE_VALUES = new Set(['all', 'concept', 'note', 'question', 'resource']);
 const SORT_VALUES: SortKey[] = ['updated', 'created', 'alpha'];
 
 export default function LibraryPage() {
-    const { nodes, links } = useKnowledgeState();
+    const { nodes, links, projects } = useKnowledgeState();
     const { deleteNode, resetToSeed } = useKnowledgeActions();
     const { toast } = useToast();
     const [searchParams, setSearchParams] = useSearchParams();
 
+    // Modal state stays component-local — it isn't URL-worthy
     const [creating, setCreating] = useState(false);
     const [editing, setEditing] = useState<KnowledgeNode | null>(null);
     const [deleting, setDeleting] = useState<KnowledgeNode | null>(null);
 
-    /* ---------- URL → state (validated) ---------- */
+    /* ---------- URL → state (validated against hand-typed garbage) ---------- */
     const query = searchParams.get('q') ?? '';
+
     const typeRaw = searchParams.get('type') ?? 'all';
     const typeFilter = (TYPE_VALUES.has(typeRaw) ? typeRaw : 'all') as EntityType | 'all';
+
     const tagFilter = searchParams.get('tag') ?? 'all';
+
     const sortRaw = searchParams.get('sort') ?? 'updated';
     const sort = (SORT_VALUES.includes(sortRaw as SortKey) ? sortRaw : 'updated') as SortKey;
+
     const sizeRaw = Number(searchParams.get('size'));
     const pageSize = PAGE_SIZES.includes(sizeRaw) ? sizeRaw : DEFAULT_PAGE_SIZE;
+
     const pageRaw = Number(searchParams.get('page'));
     const page = Number.isInteger(pageRaw) && pageRaw >= 1 ? pageRaw : 1;
 
-    /* ---------- state → URL (never touches `page`) ---------- */
+    // Project filter: 'all' | 'none' (inbox) | <projectId> — orphan ids fall back to 'all'
+    const projectRaw = searchParams.get('project') ?? 'all';
+    const projectFilter =
+        projectRaw === 'all' || projectRaw === 'none' || projects.some((p) => p.id === projectRaw)
+            ? projectRaw
+            : 'all';
+
+    /* ---------- state → URL ----------
+       Functional form = batching-safe for multi-key updates.
+       Filters never touch `page` (browse & narrow), so the page never moves.
+       Defaults are omitted so URLs stay clean. */
     const updateParams = (patch: Record<string, string | null>) => {
         setSearchParams(
             (prev) => {
@@ -58,13 +74,15 @@ export default function LibraryPage() {
     const setTagFilter = (v: string) => updateParams({ tag: v === 'all' ? null : v });
     const setSort = (v: SortKey) => updateParams({ sort: v === 'updated' ? null : v });
     const setPageSize = (s: number) => updateParams({ size: s === DEFAULT_PAGE_SIZE ? null : String(s) });
+    const setProjectFilter = (v: string) => updateParams({ project: v === 'all' ? null : v });
     const setPage = (p: number) => {
         updateParams({ page: p <= 1 ? null : String(p) });
         window.scrollTo({ top: 0, behavior: 'smooth' });
     };
-    const clearFilters = () => updateParams({ q: null, type: null, tag: null });
+    const clearFilters = () => updateParams({ q: null, type: null, tag: null, project: null });
 
-    // Deep-link ?new=1 (the "n" shortcut) — removes only itself
+    // Deep-link support: /dashboard/library?new=1 opens the create modal (shortcut "n").
+    // Removes ONLY `new` — never wipes the other params stored here.
     useEffect(() => {
         if (searchParams.get('new') === '1') {
             setCreating(true);
@@ -77,7 +95,7 @@ export default function LibraryPage() {
     }, [searchParams, setSearchParams]);
 
     /* ---------- pipeline: sort → paginate → narrow the current page ----------
-       Filters only ever narrow the page you're on, so choosing a tag/type
+       Filters only ever narrow the page you're on, so choosing a tag/type/project
        or typing a search can never move you to another page. */
     const sorted = useMemo(() => {
         const list = [...nodes];
@@ -108,23 +126,27 @@ export default function LibraryPage() {
     );
 
     const isSearching = query.trim().length > 0;
-    const isFiltering = isSearching || typeFilter !== 'all' || tagFilter !== 'all';
+    const isFiltering = isSearching || typeFilter !== 'all' || tagFilter !== 'all' || projectFilter !== 'all';
 
     const visible = useMemo(() => {
-        let list = searchNodes(pageItems, query); // ranked scoring, within this page
+        let list = searchNodes(pageItems, query);
         if (typeFilter !== 'all') list = list.filter((n) => n.type === typeFilter);
         if (tagFilter !== 'all') list = list.filter((n) => n.tags.includes(tagFilter));
+        if (projectFilter === 'none') list = list.filter((n) => !n.projectId);
+        else if (projectFilter !== 'all') list = list.filter((n) => n.projectId === projectFilter);
         return list;
-    }, [pageItems, query, typeFilter, tagFilter]);
+    }, [pageItems, query, typeFilter, tagFilter, projectFilter]);
 
-    // Pill counts describe what THIS page can show under the current query+tag
+    // Pill counts describe what THIS page can show under the other active filters
     const counts = useMemo(() => {
         let list = searchNodes(pageItems, query);
         if (tagFilter !== 'all') list = list.filter((n) => n.tags.includes(tagFilter));
+        if (projectFilter === 'none') list = list.filter((n) => !n.projectId);
+        else if (projectFilter !== 'all') list = list.filter((n) => n.projectId === projectFilter);
         const c: Record<'all' | EntityType, number> = { all: list.length, concept: 0, note: 0, question: 0, resource: 0 };
         list.forEach((n) => { c[n.type] += 1; });
         return c;
-    }, [pageItems, query, tagFilter]);
+    }, [pageItems, query, tagFilter, projectFilter]);
 
     const allTags = useMemo(
         () => Array.from(new Set(nodes.flatMap((n) => n.tags))).sort((a, b) => a.localeCompare(b)),
@@ -139,6 +161,19 @@ export default function LibraryPage() {
         });
         return m;
     }, [links]);
+
+    // Project filter options with live counts
+    const projectCounts = useMemo(() => {
+        const m = new Map<string, number>();
+        nodes.forEach((n) => { if (n.projectId) m.set(n.projectId, (m.get(n.projectId) ?? 0) + 1); });
+        return m;
+    }, [nodes]);
+
+    const projectOptions = useMemo(() => [
+        { value: 'all', label: 'All projects' },
+        { value: 'none', label: 'No project (inbox)' },
+        ...projects.map((p) => ({ value: p.id, label: p.name, meta: `${projectCounts.get(p.id) ?? 0} items` })),
+    ], [projects, projectCounts]);
 
     /* ---------- render ---------- */
     return (
@@ -158,6 +193,7 @@ export default function LibraryPage() {
                 tagFilter={tagFilter} onTagFilter={setTagFilter}
                 sort={sort} onSort={setSort}
                 tags={allTags} counts={counts}
+                projectFilter={projectFilter} onProjectFilter={setProjectFilter} projectOptions={projectOptions}
                 onNew={() => setCreating(true)}
             />
 

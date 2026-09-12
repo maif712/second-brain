@@ -1,6 +1,7 @@
 // src/features/dashboard/components/Topbar.tsx
 import { useLocation } from 'react-router';
 import { Menu } from 'lucide-react';
+import { useKnowledgeState } from '@/features/knowledge/context/KnowledgeContext';
 
 const TITLES: Record<string, string> = {
   '/dashboard': 'Overview',
@@ -11,7 +12,10 @@ const TITLES: Record<string, string> = {
 
 export function Topbar({ onMenu }: { onMenu: () => void }) {
   const { pathname } = useLocation();
-  const title = TITLES[pathname] ?? 'Item';
+  const { projects } = useKnowledgeState();
+  const projectMatch = pathname.match(/^\/dashboard\/projects\/(.+)$/);
+  const projectTitle = projectMatch ? projects.find((p) => p.id === projectMatch[1])?.name : undefined;
+  const title = projectTitle ?? (pathname === '/dashboard/projects' ? 'Projects' : TITLES[pathname]) ?? 'Item';
 
   return (
     <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-white/5 bg-void/80 px-4 backdrop-blur-xl md:px-8">

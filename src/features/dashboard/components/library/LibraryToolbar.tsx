@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/Button';
 import { TYPE_META } from '@/features/knowledge/lib/typeMeta';
 import type { EntityType } from '@/features/knowledge/types';
 import { cn } from '@/lib/cn';
-import { Select } from '@/components/ui/Select';
+import { Select, type SelectOption } from '@/components/ui/Select';
 
 export type SortKey = 'updated' | 'created' | 'alpha';
 
@@ -19,10 +19,13 @@ interface LibraryToolbarProps {
     tags: string[];
     counts: Record<'all' | EntityType, number>;
     onNew: () => void;
+    projectFilter: string;
+    onProjectFilter: (v: string) => void;
+    projectOptions: SelectOption[];
 }
 
 export function LibraryToolbar({
-    query, onQuery, typeFilter, onTypeFilter, tagFilter, onTagFilter, sort, onSort, tags, counts, onNew,
+    query, onQuery, typeFilter, onTypeFilter, tagFilter, onTagFilter, sort, onSort, tags, counts, onNew, onProjectFilter, projectOptions, projectFilter
 }: LibraryToolbarProps) {
     return (
         <div className="space-y-3">
@@ -66,6 +69,8 @@ export function LibraryToolbar({
                     ]}
                     className="md:w-44"
                 />
+
+                <Select ariaLabel="Filter by project" value={projectFilter} onChange={onProjectFilter} options={projectOptions} className="md:w-48" />
 
                 <Button onClick={onNew} className="shrink-0"><Plus size={16} /> New item</Button>
             </div>

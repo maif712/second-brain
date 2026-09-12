@@ -15,6 +15,7 @@ export interface KnowledgeNode {
   status?: QuestionStatus;
   url?: string;
   resourceKind?: ResourceKind;
+  projectId?: string | null;
 }
 
 export interface KnowledgeLink {
@@ -34,9 +35,27 @@ export interface NewNodeInput {
   status?: QuestionStatus;
   url?: string;
   resourceKind?: ResourceKind;
+  projectId?: string | null;
 }
 
-/** Patch for updates — identity fields are protected. */
+export type ProjectColorKey = 'violet' | 'sky' | 'emerald' | 'amber' | 'rose' | 'cyan' | 'fuchsia' | 'lime';
+
+export interface Project {
+  id: string;
+  name: string;
+  description: string;
+  color: ProjectColorKey;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface NewProjectInput {
+  name: string;
+  description?: string;
+  color: ProjectColorKey;
+}
+
+// 3) Add 'projectId' to the NodePatch pick list:
 export type NodePatch = Partial<Pick<KnowledgeNode,
-  'title' | 'content' | 'tags' | 'status' | 'url' | 'resourceKind' | 'lastReviewedAt'
+  'title' | 'content' | 'tags' | 'status' | 'url' | 'resourceKind' | 'lastReviewedAt' | 'projectId'
 >>;
