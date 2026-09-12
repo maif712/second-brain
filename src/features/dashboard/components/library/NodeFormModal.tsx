@@ -2,12 +2,12 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
-import { useKnowledgeActions } from '@/features/knowledge/context/KnowledgeContext';
+import { Select } from '@/components/ui/Select';
+import { useToast } from '@/components/ui/toast/ToastContext';
+import { useKnowledgeState, useKnowledgeActions } from '@/features/knowledge/context/KnowledgeContext';
 import { TYPE_META } from '@/features/knowledge/lib/typeMeta';
 import type { EntityType, KnowledgeNode, QuestionStatus, ResourceKind } from '@/features/knowledge/types';
 import { cn } from '@/lib/cn';
-import { useToast } from '@/components/ui/toast/ToastContext';
-import { Select } from '@/components/ui/Select';
 
 const inputCls =
     'w-full rounded-xl border border-white/10 bg-white/[0.04] px-3.5 py-2.5 text-sm text-white placeholder:text-slate-600 outline-none transition focus:border-violet-400/50 focus:ring-2 focus:ring-violet-400/20';
@@ -21,11 +21,17 @@ interface FormState {
     status: QuestionStatus;
     url: string;
     resourceKind: ResourceKind;
+    projectId: string; // '' = no project (general library)
 }
 type FormErrors = Partial<Record<'title' | 'url', string>>;
 
-function toForm(node: KnowledgeNode | null, fallbackType: EntityType): FormState {
-    if (!node) return { type: fallbackType, title: '', content: '', tagsInput: '', status: 'open', url: '', resourceKind: 'article' };
+function toForm(node: KnowledgeNode | null, fallbackType: EntityType, fallbackProjectId: string): FormState {
+    if (!node) {
+        return {
+            type: fallbackType, title: '', content: '', tagsInput: '',
+            status: 'open', url: '', resourceKind: 'article', projectId: fallbackProjectId,
+        };
+    }
     return {
         type: node.type,
         title: node.title,
@@ -34,34 +40,47 @@ function toForm(node: KnowledgeNode | null, fallbackType: EntityType): FormState
         status: node.status ?? 'open',
         url: node.url ?? '',
         resourceKind: node.resourceKind ?? 'article',
+        projectId: node.projectId ?? '',
     };
 }
 
 interface NodeFormModalProps {
     open: boolean;
     onClose: () => void;
-    initial?: KnowledgeNode | null; // present → edit mode
+    initial?: KnowledgeNode | null;      // present → edit mode
     defaultType?: EntityType;
+    defaultProjectId?: string | null;    // used when creating inside a project workspace
 }
 
-export function NodeFormModal({ open, onClose, initial = null, defaultType = 'concept' }: NodeFormModalProps) {
+export function NodeFormModal({
+    open, onClose, initial = null, defaultType = 'concept', defaultProjectId = null,
+}: NodeFormModalProps) {
+    const { projects } = useKnowledgeState();
     const { addNode, updateNode } = useKnowledgeActions();
-    const [form, setForm] = useState<FormState>(() => toForm(initial, defaultType));
+    const { toast } = useToast();
+    const [form, setForm] = useState<FormState>(() => toForm(initial, defaultType, defaultProjectId ?? ''));
     const [errors, setErrors] = useState<FormErrors>({});
     const isEdit = initial !== null;
-    const { toast } = useToast();
 
     // Reset the form every time the modal (re)opens — fresh node or fresh defaults.
     useEffect(() => {
         if (open) {
-            setForm(toForm(initial, defaultType));
+            setForm(toForm(initial, defaultType, defaultProjectId ?? ''));
             setErrors({});
         }
-    }, [open, initial, defaultType]);
+    }, [open, initial, defaultType, defaultProjectId]);
 
     const tagPreview = useMemo(
         () => Array.from(new Set(form.tagsInput.split(',').map((t) => t.trim()).filter(Boolean))),
         [form.tagsInput],
+    );
+
+    const projectOptions = useMemo(
+        () => [
+            { value: '', label: 'No project — general library' },
+            ...projects.map((p) => ({ value: p.id, label: p.name })),
+        ],
+        [projects],
     );
 
     const set = <K extends keyof FormState>(key: K, value: FormState[K]) =>
@@ -86,6 +105,7 @@ export function NodeFormModal({ open, onClose, initial = null, defaultType = 'co
             title,
             content: form.content.trim(),
             tags: tagPreview, // already trimmed + deduped
+            projectId: form.projectId || null,
             ...(form.type === 'question' ? { status: form.status } : {}),
             ...(form.type === 'resource' ? { url: form.url.trim() || undefined, resourceKind: form.resourceKind } : {}),
         };
@@ -134,6 +154,18 @@ export function NodeFormModal({ open, onClose, initial = null, defaultType = 'co
                     )}
                 </div>
 
+                {/* Project assignment */}
+                <div>
+                    <span className={labelCls}>Project</span>
+                    <Select
+                        ariaLabel="Assign to project"
+                        value={form.projectId}
+                        onChange={(v) => set('projectId', v)}
+                        options={projectOptions}
+                    />
+                </div>
+
+                {/* Title */}
                 <div>
                     <label htmlFor="nb-title" className={labelCls}>Title *</label>
                     <input
@@ -145,6 +177,7 @@ export function NodeFormModal({ open, onClose, initial = null, defaultType = 'co
                     {errors.title && <p className="mt-1.5 text-xs text-rose-400">{errors.title}</p>}
                 </div>
 
+                {/* Content */}
                 <div>
                     <label htmlFor="nb-content" className={labelCls}>Content</label>
                     <textarea
@@ -155,9 +188,10 @@ export function NodeFormModal({ open, onClose, initial = null, defaultType = 'co
                     />
                 </div>
 
+                {/* Question-only field */}
                 {form.type === 'question' && (
                     <div>
-                        <label htmlFor="nb-status" className={labelCls}>Status</label>
+                        <span className={labelCls}>Status</span>
                         <Select
                             ariaLabel="Question status"
                             value={form.status}
@@ -170,6 +204,7 @@ export function NodeFormModal({ open, onClose, initial = null, defaultType = 'co
                     </div>
                 )}
 
+                {/* Resource-only fields */}
                 {form.type === 'resource' && (
                     <div className="grid gap-4 sm:grid-cols-2">
                         <div>
@@ -183,7 +218,7 @@ export function NodeFormModal({ open, onClose, initial = null, defaultType = 'co
                             {errors.url && <p className="mt-1.5 text-xs text-rose-400">{errors.url}</p>}
                         </div>
                         <div>
-                            <label htmlFor="nb-kind" className={labelCls}>Kind</label>
+                            <span className={labelCls}>Kind</span>
                             <Select
                                 ariaLabel="Resource kind"
                                 value={form.resourceKind}
@@ -194,6 +229,7 @@ export function NodeFormModal({ open, onClose, initial = null, defaultType = 'co
                     </div>
                 )}
 
+                {/* Tags */}
                 <div>
                     <label htmlFor="nb-tags" className={labelCls}>Tags (comma separated)</label>
                     <input

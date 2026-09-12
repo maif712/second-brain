@@ -1,19 +1,21 @@
 // src/features/dashboard/components/Sidebar.tsx
 import { Link, NavLink } from 'react-router';
-import { BrainCircuit, CalendarClock, LayoutDashboard, Library, Waypoints } from 'lucide-react';
+import { BrainCircuit, CalendarClock, FolderKanban, LayoutDashboard, Library, Waypoints } from 'lucide-react';
 import { useKnowledgeState } from '@/features/knowledge/context/KnowledgeContext';
 import { computeHealth, getStale } from '@/features/knowledge/lib/health';
 import { cn } from '@/lib/cn';
+import { getProjectColor } from '@/features/knowledge/lib/projectColors';
 
 const NAV = [
   { to: '/dashboard', label: 'Overview', icon: LayoutDashboard, end: true },
+  { to: '/dashboard/projects', label: 'Projects', icon: FolderKanban },
   { to: '/dashboard/library', label: 'Library', icon: Library },
   { to: '/dashboard/graph', label: 'Graph', icon: Waypoints },
   { to: '/dashboard/review', label: 'Review', icon: CalendarClock },
 ];
 
 export function Sidebar({ className, onNavigate }: { className?: string; onNavigate?: () => void }) {
-  const { nodes, links } = useKnowledgeState();
+  const { nodes, links, projects } = useKnowledgeState();
   const dueCount = getStale(nodes).length;
   const { score } = computeHealth(nodes, links);
 
@@ -26,7 +28,7 @@ export function Sidebar({ className, onNavigate }: { className?: string; onNavig
         <Link to="/" className="font-display font-semibold text-white">Second Brain</Link>
       </div>
 
-      <nav className="flex-1 space-y-1 p-3">
+      <nav className="flex-1 space-y-1 overflow-y-auto p-3">
         {NAV.map(({ to, label, icon: Icon, end }) => (
           <NavLink
             key={to} to={to} end={end} onClick={onNavigate}
@@ -43,6 +45,30 @@ export function Sidebar({ className, onNavigate }: { className?: string; onNavig
             )}
           </NavLink>
         ))}
+        <p className="px-3.5 pb-1 pt-4 text-[10px] font-semibold uppercase tracking-widest text-slate-600">Projects</p>
+        {projects.length === 0 ? (
+          <p className="px-3.5 text-xs text-slate-600">No projects yet</p>
+        ) : (
+          projects.map((p) => {
+            const c = getProjectColor(p.color);
+            const count = nodes.filter((n) => n.projectId === p.id).length;
+            return (
+              <NavLink
+                key={p.id} to={`/dashboard/projects/${p.id}`} onClick={onNavigate}
+                className={({ isActive }) => cn(
+                  'flex items-center justify-between rounded-xl px-3.5 py-2 text-sm transition',
+                  isActive ? 'bg-white/5 text-white ring-1 ring-white/10' : 'text-slate-400 hover:bg-white/5 hover:text-white',
+                )}
+              >
+                <span className="flex min-w-0 items-center gap-2.5">
+                  <span className={cn('h-2 w-2 shrink-0 rounded-full', c.dot)} />
+                  <span className="truncate">{p.name}</span>
+                </span>
+                <span className="text-[11px] text-slate-600">{count}</span>
+              </NavLink>
+            );
+          })
+        )}
       </nav>
 
       <div className="border-t border-white/5 p-4">
@@ -55,6 +81,6 @@ export function Sidebar({ className, onNavigate }: { className?: string; onNavig
         </div>
         <p className="mt-3 text-[11px] leading-relaxed text-slate-600">Everything is stored in localStorage. No account, no server.</p>
       </div>
-    </aside>
+    </aside >
   );
 }
