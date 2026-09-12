@@ -7,6 +7,8 @@ import LibraryPage from '@/features/dashboard/pages/LibraryPage';
 import NodeDetailPage from '@/features/dashboard/pages/NodeDetailPage';
 import ReviewPage from '@/features/dashboard/pages/ReviewPage';
 import GraphPage from '@/features/dashboard/pages/GraphPage';
+import ProjectsPage from '@/features/dashboard/pages/ProjectsPage';
+import ProjectWorkspacePage from '@/features/dashboard/pages/ProjectWorkspacePage';
 
 function NotFound() {
   return (
@@ -30,6 +32,8 @@ export default function App() {
         <Route path="nodes/:id" element={<NodeDetailPage />} />
         <Route path="review" element={<ReviewPage />} />
         <Route path="graph" element={<GraphPage />} />
+        <Route path="projects" element={<ProjectsPage />} />
+        <Route path="projects/:id" element={<ProjectWorkspacePage />} />
       </Route>
       <Route path="*" element={<NotFound />} />
     </Routes>

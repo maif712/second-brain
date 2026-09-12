@@ -5,16 +5,24 @@ import {
 import { nanoid } from 'nanoid';
 import { knowledgeReducer, type KnowledgeState } from './knowledgeReducer';
 import { loadState, saveState } from '../lib/storage';
-import { seedLinks, seedNodes } from '../lib/seed';
-import type { NewNodeInput, NodePatch } from '../types';
+import { seedLinks, seedNodes, seedProjects } from '../lib/seed';
+import type { NewNodeInput, NewProjectInput, NodePatch, Project } from '../types';
 
 export interface KnowledgeActions {
+    // nodes
     addNode: (input: NewNodeInput) => string;
     updateNode: (id: string, patch: NodePatch) => void;
     deleteNode: (id: string) => void;
+    // links
     addLink: (sourceId: string, targetId: string, label?: string) => void;
     removeLink: (id: string) => void;
+    // review
     markReviewed: (id: string) => void;
+    // projects
+    addProject: (input: NewProjectInput) => string;
+    updateProject: (id: string, patch: Partial<Pick<Project, 'name' | 'description' | 'color'>>) => void;
+    deleteProject: (id: string, mode: 'unassign' | 'delete-items') => void;
+    // global
     resetToSeed: () => void;
     clearAll: () => void;
 }
@@ -37,7 +45,8 @@ export function KnowledgeProvider({ children }: { children: ReactNode }) {
     const actions = useMemo<KnowledgeActions>(() => {
         const now = () => new Date().toISOString();
         return {
-            // Impure work (ids, timestamps) happens HERE — never inside the reducer.
+            /* ---------------- nodes ----------------
+               Impure work (ids, timestamps) happens HERE — never inside the reducer. */
             addNode: (input) => {
                 const id = nanoid(10);
                 const t = now();
@@ -52,6 +61,7 @@ export function KnowledgeProvider({ children }: { children: ReactNode }) {
                         status: input.type === 'question' ? input.status ?? 'open' : undefined,
                         url: input.type === 'resource' ? input.url : undefined,
                         resourceKind: input.type === 'resource' ? input.resourceKind ?? 'article' : undefined,
+                        projectId: input.projectId ?? null,
                         createdAt: t,
                         updatedAt: t,
                         lastReviewedAt: null,
@@ -59,16 +69,55 @@ export function KnowledgeProvider({ children }: { children: ReactNode }) {
                 });
                 return id;
             },
+
             updateNode: (id, patch) => dispatch({ type: 'UPDATE_NODE', id, patch, at: now() }),
+
             deleteNode: (id) => dispatch({ type: 'DELETE_NODE', id }),
+
+            /* ---------------- links ----------------
+               Invalid links (self, duplicate, missing nodes) are rejected by the reducer. */
             addLink: (sourceId, targetId, label = 'related to') =>
                 dispatch({
                     type: 'ADD_LINK',
                     link: { id: nanoid(10), sourceId, targetId, label: label.trim() || 'related to', createdAt: now() },
-                }), // invalid links are rejected by the reducer, not here
+                }),
+
             removeLink: (id) => dispatch({ type: 'REMOVE_LINK', id }),
+
+            /* ---------------- review ---------------- */
             markReviewed: (id) => dispatch({ type: 'MARK_REVIEWED', id, at: now() }),
-            resetToSeed: () => dispatch({ type: 'RESET', state: { nodes: seedNodes, links: seedLinks } }),
+
+            /* ---------------- projects ---------------- */
+            addProject: (input) => {
+                const id = nanoid(10);
+                const t = now();
+                dispatch({
+                    type: 'ADD_PROJECT',
+                    project: {
+                        id,
+                        name: input.name.trim(),
+                        description: input.description?.trim() ?? '',
+                        color: input.color,
+                        createdAt: t,
+                        updatedAt: t,
+                    },
+                });
+                return id;
+            },
+
+            updateProject: (id, patch) => dispatch({ type: 'UPDATE_PROJECT', id, patch, at: now() }),
+
+            // mode: 'unassign' → items return to the general library
+            //       'delete-items' → items AND their links are removed (reducer cascades)
+            deleteProject: (id, mode) => dispatch({ type: 'DELETE_PROJECT', id, mode }),
+
+            /* ---------------- global ---------------- */
+            resetToSeed: () =>
+                dispatch({
+                    type: 'RESET',
+                    state: { nodes: seedNodes, links: seedLinks, projects: seedProjects },
+                }),
+
             clearAll: () => dispatch({ type: 'CLEAR' }),
         };
     }, []);

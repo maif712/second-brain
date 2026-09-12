@@ -12,11 +12,12 @@ import { ConnectionsPanel } from '../components/detail/ConnectionsPanel';
 import { NodeFormModal } from '../components/library/NodeFormModal';
 import { cn } from '@/lib/cn';
 import { useToast } from '@/components/ui/toast/ToastContext';
+import { Select } from '@/components/ui/Select';
 
 export default function NodeDetailPage() {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
-    const { nodes } = useKnowledgeState();
+    const { nodes, projects } = useKnowledgeState();
     const { updateNode, deleteNode, markReviewed } = useKnowledgeActions();
     const [editing, setEditing] = useState(false);
     const [confirmDelete, setConfirmDelete] = useState(false);
@@ -121,6 +122,21 @@ export default function NodeDetailPage() {
                                 </div>
                             ))}
                         </dl>
+                        <div className="mt-5">
+                            <p className="mb-1.5 text-xs font-medium uppercase tracking-wider text-slate-500">Project</p>
+                            <Select
+                                ariaLabel="Move to project"
+                                value={node.projectId ?? ''}
+                                onChange={(v) => {
+                                    updateNode(node.id, { projectId: v || null });
+                                    toast(v ? `Moved to “${projects.find((p) => p.id === v)?.name}”` : 'Moved to general library');
+                                }}
+                                options={[
+                                    { value: '', label: 'No project — general library' },
+                                    ...projects.map((p) => ({ value: p.id, label: p.name })),
+                                ]}
+                            />
+                        </div>
                         <Button variant="ghost" onClick={() => { markReviewed(node.id); toast('Marked as reviewed'); }}>
                             <CheckCheck size={15} /> Mark as reviewed
                         </Button>
